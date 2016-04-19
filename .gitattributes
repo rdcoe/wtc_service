@@ -1,0 +1,19 @@
+* text=auto !eol
+wcappctl/.project -text svneol=unset#application/xml
+wcappctl/Makefile -text
+wcappctl/README -text
+wcappctl/properties.mk -text
+wcappctl/src/Makefile -text
+wcappctl/src/scripts/etc/init.d/wcappctl -text
+wcappctl/src/scripts/ptc/Windchill_10.1/README -text
+wcappctl/src/scripts/ptc/Windchill_10.1/config.bash -text
+wcappctl/src/scripts/ptc/Windchill_10.1/functions.bash -text
+wcappctl/src/tests/functions.bash -text
+wcappctl/src/tests/run_tests -text
+wcappctl/src/tests/scaffolding.bash -text
+wcappctl/src/tests/test_httpd.sh -text
+wcappctl/src/tests/test_wcappctl.sh -text
+wcappctl/src/tests/test_wcappctl_integration.sh -text
+wcappctl/src/tests/test_windchill.sh -text
+wcappctl/src/tests/test_windchillds.sh -text
+wcappctl/wcappctl.spec -text

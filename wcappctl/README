@@ -1,0 +1,14 @@
+This project builds an rpm that installs scripts to control Windchill.  Building
+the project needs to be done on the target platform, to ensure rpm compatibility 
+(there are no compiled binaries to worry about).
+
+Build the rpm:
+# make
+
+The default make target will set up the build environment in the /home/build and
+build the rpm there.  If the rpm builds successfully, it will be copied back to 
+./dist.
+
+You should create a chrooted enviroment for testing the rpm but there's not much 
+damage to be done by installing it, since there are no runnables.  To install, 
+e.g., rpm -Uhv wcappctl-1-1.noarch.rpm

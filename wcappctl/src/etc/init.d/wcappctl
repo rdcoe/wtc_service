@@ -1,0 +1,113 @@
+#!/bin/bash
+#
+# wcappctl	script for controlling Windchill
+#
+# chkconfig: 345 99 1
+#
+# description: This is the master script for managing Windchill services.
+#
+#########################################################################
+
+if [ -f /etc/rc.d/init.d/functions ]; then
+	. /etc/rc.d/init.d/functions
+fi
+
+# set WC_ROOT if not already set (set by the unit test runner)
+WC_ROOT=${WC_ROOT:-"/ptc/Windchill_10.1"}
+
+CONFIG=${WC_ROOT}/config.bash
+if [ -f ${CONFIG} ]; then
+	. ${CONFIG}
+else
+	echo "Could not execute $(basename $0): ${CONFIG} file missing.  Expected location is $WC_ROOT"
+	exit 1
+fi
+
+# source wcappctl FUNCTIONS
+if [ -f ${FUNCTIONS} ]; then
+	. ${FUNCTIONS}
+else
+	echo "Could not execute $(basename $0): ${FUNCTIONS} file is missing.  Expected location is $WC_ROOT"
+    exit 1
+fi
+
+if [ "$(get_uid)" -ne "0" ]; then
+    echo "This script can only be run as root."
+    exit 1
+fi
+function usage() {
+	echo "Usage: $(basename $0) start | stop | restart | halt | continue | status"
+	echo "   start - starts WindchillDS, Windchill and HTTP servers"
+	echo "   stop - stops services in reverse order of start sequence"
+	echo "   restart - stops then starts all services"
+	echo "   halt - stops the HTTP server but leaves WindchillDS and Windchill running (used during system maintenance)"
+	echo "   continue - restarts the HTTP server"
+	echo "   status - returns status of all Windchill services"
+}
+
+case "$1" in
+	start)
+		rotate_log $LOG
+
+		is_listener_active $SQL_SERVER $SQL_SERVER_PORT >/dev/null
+		RETVAL=$?
+		[ ${RETVAL} -ne 0 ] && log "SQL Server is not listening.  Refusing to start." && exit ${RETVAL}
+		ds start
+		RETVAL=$?
+		[ ${RETVAL} -ne 0 ] && log "Failed to start the Windchill Directory server." && exit ${RETVAL}
+		windchill start
+		RETVAL=$?
+		[ ${RETVAL} -ne 0 ] && log "Failed to start Windchill." && exit ${RETVAL}
+		wc_httpd start
+		RETVAL=$?
+		[ ${RETVAL} -ne 0 ] && log "Failed to start the Windchill HTTP server." &&  exit ${RETVAL}
+	;;
+	stop)
+		wc_httpd graceful-stop
+		RETVAL=$?
+		if [ ${RETVAL} -ne 0 ]; then
+			log "Failed to stop the HTTP server. Killing it."
+			killall $HTTPD_PROC
+		fi
+		windchill stop
+		RETVAL=$?
+		if [ ${RETVAL} -ne 0 ]; then
+			log "Failed to stop the Windchill server. Killing it."
+			pid=$(find_parent_pid "$WINDCHILL_PID" "$WINDCHILL_PROC" "$WINDCHILL_PROC_VERIFY") 
+			[[ -n "$pid" && "$pid" -ne 0 ]] && echo "killing process $pid" && kill -9 $pid
+		fi
+		ds stop
+		RETVAL=$?
+		[ ${RETVAL} -ne 0 ] && log "Failed to stop the Windchill Directory server." && exit ${RETVAL}
+		if [ ${RETVAL} -ne 0 ]; then
+			log "Failed to stop the Windchill DS server. Killing it."
+			pid=$(find_parent_pid "$DS_PID" "$DS_PROC" "$DS_PROC_VERIFY")
+			[[ -n "$pid" && "$pid" -ne 0 ]] && echo "killing process $pid" && kill -9 $pid
+		fi 
+	;;
+	restart)
+		$0 stop
+		$0 start
+		RETVAL=$?
+	;;
+	halt)
+		echo -n "Halting the acceptance of Windchill requests:"
+		# Reconfigure apache to intercept requests. (Special case for backups)
+		#TODO reconfigure apache to produce a maintenance page
+		wc_httpd graceful-stop
+ 	;; 	
+	continue)
+		echo -n "Continuing the acceptance of Windchill requests:"
+		wc_httpd start
+	;;
+	status)
+		arr=( "httpd:$HTTPD_PID" "Windchill:$WINDCHILL_PID" "WindchillDS:$DS_PID" )
+		my_status arr[@]
+	;;
+	*)
+		usage
+		RETVAL=1
+	;;
+esac
+
+exit $RETVAL
